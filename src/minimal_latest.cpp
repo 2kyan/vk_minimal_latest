@@ -171,9 +171,9 @@ static const auto s_vertices = std::to_array<shaderio::Vertex>({
     {{-0.5F, 0.5F, 0.5F}, {0.0F, 0.0F, 1.0F}, {0.5F, 0.5F}},
     {{0.5F, 0.5F, 0.5F}, {0.0F, 1.0F, 0.0F}, {0.5F, 0.5F}},
     //
-    {{0.1F, -0.4F, 0.75F}, {.3F, .3F, .3F}, {0.5F, 1.0F}},  // White triangle (textured)
-    {{-0.4F, 0.6F, 0.25F}, {1.0F, 1.0F, 1.0F}, {1.0F, 0.0F}},
-    {{0.6F, 0.6F, 0.75F}, {.7F, .7F, .7F}, {0.0F, 0.0F}},
+    {{0.0F, -1.0F, 0.75F}, {.3F, .3F, .3F}, {0.5F, 1.0F}},  // White triangle (textured)
+    {{-1.0F, 1.0F, 0.25F}, {1.0F, 1.0F, 1.0F}, {1.0F, 0.0F}},
+    {{1.0F, 1.0F, 0.75F}, {.7F, .7F, .7F}, {0.0F, 0.0F}},
 });
 
 
@@ -256,6 +256,8 @@ public:
         {
           if(ImGui::MenuItem("vSync", "", &m_vSync))
             m_swapchain.requestRebuild();  // Recreate the swapchain with the new vSync setting
+          if(ImGui::MenuItem("Dump RenderTarget", "F11"))
+            m_dumpRenderTargetRequested = true;
           ImGui::Separator();
           if(ImGui::MenuItem("Exit"))
             glfwSetWindowShouldClose(m_window, true);
@@ -281,6 +283,8 @@ public:
 
       // Extra ImGui windows can be added here, like the demo window.
       // ImGui::ShowDemoWindow();
+      if(ImGui::IsKeyPressed(ImGuiKey_F11))
+        m_dumpRenderTargetRequested = true;
 
       // Frame Resource Preparation - only render if preparation succeeds
       if(prepareFrameResources())
@@ -296,6 +300,12 @@ public:
 
         // End frame and present
         endFrame(cmd);
+
+        if(m_dumpRenderTargetRequested)
+        {
+          m_dumpRenderTargetRequested = false;
+          dumpRenderTargetToPpm();
+        }
       }
       else
       {
@@ -763,6 +773,77 @@ private:
       ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
     }
     endDynamicRenderingToSwapchain(cmd);
+  }
+
+  void dumpRenderTargetToPpm()
+  {
+    VkDevice device = m_context.getDevice();
+    VK_CHECK(vkDeviceWaitIdle(device));
+
+    const std::filesystem::path filename = std::filesystem::path("rendertarget_" + std::to_string(++m_renderTargetDumpIndex) + ".ppm");
+    const VkExtent2D size      = m_renderTarget.getSize();
+    const VkDeviceSize bytes   = VkDeviceSize(size.width) * VkDeviceSize(size.height) * 4;
+    utils::Buffer readbackBuffer = m_allocator.createBuffer(bytes, VK_BUFFER_USAGE_2_TRANSFER_DST_BIT,
+                                                            VMA_MEMORY_USAGE_AUTO,
+                                                            VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT);
+
+    VkCommandBuffer cmd = utils::beginSingleTimeCommands(device, m_transientCmdPool);
+    const VkImageMemoryBarrier2 imageToCopy{
+        .sType         = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask  = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+        .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+        .dstStageMask  = VK_PIPELINE_STAGE_2_COPY_BIT,
+        .dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT,
+        .oldLayout     = VK_IMAGE_LAYOUT_GENERAL,
+        .newLayout     = VK_IMAGE_LAYOUT_GENERAL,
+        .image         = m_renderTarget.getColorImage(),
+        .subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1},
+    };
+    const VkDependencyInfo imageToCopyDep{
+        .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers    = &imageToCopy,
+    };
+    vkCmdPipelineBarrier2(cmd, &imageToCopyDep);
+
+    const VkBufferImageCopy copyRegion{
+        .bufferOffset      = 0,
+        .bufferRowLength   = 0,
+        .bufferImageHeight = 0,
+        .imageSubresource  = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1},
+        .imageOffset       = {0, 0, 0},
+        .imageExtent       = {size.width, size.height, 1},
+    };
+    vkCmdCopyImageToBuffer(cmd, m_renderTarget.getColorImage(), VK_IMAGE_LAYOUT_GENERAL, readbackBuffer.buffer, 1, &copyRegion);
+    utils::endSingleTimeCommands(cmd, device, m_transientCmdPool, m_context.getGraphicsQueue().queue);
+
+    VK_CHECK(vmaInvalidateAllocation(m_allocator, readbackBuffer.allocation, 0, bytes));
+
+    void* mappedData = nullptr;
+    VK_CHECK(vmaMapMemory(m_allocator, readbackBuffer.allocation, &mappedData));
+    const auto* rgba = static_cast<const uint8_t*>(mappedData);
+
+    std::ofstream file(filename, std::ios::binary);
+    if(!file.is_open())
+    {
+      LOGE("Could not open render target dump file: %s", filename.string().c_str());
+      vmaUnmapMemory(m_allocator, readbackBuffer.allocation);
+      m_allocator.destroyBuffer(readbackBuffer);
+      return;
+    }
+    file << "P6\n" << size.width << " " << size.height << "\n255\n";
+    for(uint32_t y = 0; y < size.height; ++y)
+    {
+      for(uint32_t x = 0; x < size.width; ++x)
+      {
+        const uint8_t* pixel = rgba + (size_t(y) * size.width + x) * 4;
+        file.write(reinterpret_cast<const char*>(pixel), 3);
+      }
+    }
+
+    vmaUnmapMemory(m_allocator, readbackBuffer.allocation);
+    m_allocator.destroyBuffer(readbackBuffer);
+    LOGI("Dumped RenderTarget to %s", filename.string().c_str());
   }
 
 
@@ -1771,6 +1852,8 @@ private:
   utils::FramePacer m_framePacer;  // Utility to pace the frame rate
 
   bool              m_vSync{true};                           // VSync on or off
+  bool              m_dumpRenderTargetRequested{false};       // Debug capture request, written after the frame is submitted
+  uint32_t          m_renderTargetDumpIndex{0};               // Makes repeated captures use unique filenames
   int               m_imageID{0};                            // The current image to display
   uint32_t          m_maxTextures{10000};                    // Maximum textures allowed in the application
   VkClearColorValue m_clearColor{{0.2f, 0.2f, 0.3f, 1.0f}};  // The clear color

@@ -73,5 +73,6 @@ void main()
     triangleColor *= texture(sampler2D(heapTextures[nonuniformEXT(scene.sceneInfo.texId)], heapSamplers[0]), inUv);
 
   // Blend the point with the background based on the minimum distance
-  outColor = mix(pointColor, triangleColor, alpha);
+  //outColor = mix(pointColor, triangleColor, alpha);
+  outColor = triangleColor;
 }
