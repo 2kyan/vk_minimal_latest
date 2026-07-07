@@ -24,12 +24,12 @@ struct SceneInfo
   vec2     resolution;         // Viewport resolution
   float    animValue;          // Animation value (sine wave)
   int      numData;            // Number of points in the data buffer
-  int      texId;              // Which texture to sample from the descriptor heap
+  int      texId;              // Which texture to sample (index into the descriptor set texture array)
 };
 
-// Push data for the graphics pipeline (vkCmdPushDataEXT).
-// With descriptor heap, the pipeline layout is VK_NULL_HANDLE, so traditional push constants
-// and push descriptors cannot be used. Push data carries only the minimum needed per draw call:
+// Push constants for the graphics pipeline.
+// Carried via a real VkPipelineLayout push constant range covering VS + FS stages.
+// Holds the minimum needed per draw call:
 // the address of the scene buffer (updated once per frame) and the per-draw color.
 struct GraphicsPushData
 {

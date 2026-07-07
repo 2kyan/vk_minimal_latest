@@ -170,6 +170,7 @@ struct ImageResource : Image
   VkExtent2D    extent{};  // Size of the image
   VkFormat      format{};  // Format of the image (e.g. VK_FORMAT_R8G8B8A8_UNORM)
   VkImageLayout layout{};  // Layout of the image (color attachment, shader read, ...)
+  VkImageView   view{};    // Image view for shader sampling
 };
 
 /*- Not implemented here -*/
@@ -1807,7 +1808,15 @@ public:
   /*-- Destroy image --*/
   void destroyImage(Image& image) { vmaDestroyImage(m_allocator, image.image, image.allocation); }
 
-  void destroyImageResource(ImageResource& imageResource) { destroyImage(imageResource); }
+  void destroyImageResource(ImageResource& imageResource)
+  {
+    if(imageResource.view != VK_NULL_HANDLE)
+    {
+      vkDestroyImageView(m_device, imageResource.view, nullptr);
+      imageResource.view = VK_NULL_HANDLE;
+    }
+    destroyImage(imageResource);
+  }
 
   /*-- Create an image and upload data using a staging buffer --*/
   template <typename T>
@@ -2247,13 +2256,13 @@ private:
         vkCmdClearColorImage(cmd, m_res.colorImages[c].image, layout, &clearValue, uint32_t(range.size()), range.data());
       }
 
-      // Change depth image layout
-      if(m_createInfo.depth != VK_FORMAT_UNDEFINED)
-      {
-        cmdInitImageLayout(cmd, m_res.depthImage.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+              // Change depth image layout
+        if(m_createInfo.depth != VK_FORMAT_UNDEFINED)
+        {
+          cmdInitImageLayout(cmd, m_res.depthImage.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+        }
       }
     }
-  }
 
   /*--
    * Clean up all Vulkan resources

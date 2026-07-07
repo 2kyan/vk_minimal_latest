@@ -14,8 +14,8 @@ layout(location = LVTexCoord) in vec2 inUv;
 layout(location = 0) out vec3 outColor;
 layout(location = 1) out vec2 outUv;
 
-// Push data (vkCmdPushDataEXT): carries the scene buffer address and per-draw color.
-// With descriptor heap the pipeline layout is VK_NULL_HANDLE, so push constants/descriptors can't be used.
+// Push constants: carries the scene buffer address and per-draw color.
+// Backed by a real VkPipelineLayout with a VkPushConstantRange (shared with the fragment shader).
 layout(push_constant, scalar) uniform GraphicsPushData_
 {
   GraphicsPushData pushData;

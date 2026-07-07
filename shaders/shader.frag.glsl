@@ -5,7 +5,6 @@
 #extension GL_EXT_shader_explicit_arithmetic_types : require  // For uint64_t, ...
 #extension GL_EXT_buffer_reference2 : require                 // For buffer reference
 #extension GL_EXT_nonuniform_qualifier : require              // For non-uniform indexing of the texture array
-#extension GL_EXT_descriptor_heap : enable                    // For bindless descriptor heap access (VK_EXT_descriptor_heap)
 
 #extension GL_EXT_debug_printf : require                          // For printf in shader (debugging)
 
@@ -16,14 +15,14 @@ layout(location = 1) in vec2 inUv;
 
 layout(location = 0) out vec4 outColor;
 
-// Descriptor heap: textures and samplers are stored in GPU heap buffers (not descriptor sets).
-// The shader accesses them by index. Heap index 0 holds our linear sampler (written in createDescriptorHeap).
-// Image heap indices 0..N correspond to the loaded textures (also written in createDescriptorHeap).
-layout(descriptor_heap) uniform texture2D heapTextures[];  // Image descriptors from the resource heap
-layout(descriptor_heap) uniform sampler   heapSamplers[];  // Sampler descriptors from the sampler heap
+// Traditional Vulkan 1.3 descriptor set bindings.
+// set=0, binding=0: array of all loaded textures (sampled images)
+// set=0, binding=1: single linear sampler shared across all textures
+layout(set = 0, binding = 0) uniform texture2D textures[];  // Array of all loaded textures
+layout(set = 0, binding = 1) uniform sampler   linearSampler;  // Shared linear sampler
 
-// Push data (vkCmdPushDataEXT): only carries the scene buffer address and per-draw color.
-// With descriptor heap the pipeline layout is VK_NULL_HANDLE, so push constants/descriptors can't be used.
+// Push constants: carries the scene buffer address and per-draw color.
+// Now backed by a real VkPipelineLayout with a VkPushConstantRange.
 layout(push_constant, scalar) uniform GraphicsPushData_
 {
   GraphicsPushData pushData;
@@ -68,11 +67,10 @@ void main_ref()
   vec4 pointColor = vec4(scene.sceneInfo.animValue * pushData.color, 1.0);  // points flashing using the per-draw color
   vec4 triangleColor = vec4(fragColor, 1.0);                                // Interpolated color from the vertex shader
 
-  // Sample texture using descriptor heap: combine image and sampler by their heap indices.
-  // heapTextures[texId] picks the image from the resource heap; heapSamplers[0] picks the linear sampler.
-  // nonuniformEXT is required because the index may vary across invocations.
+  // Sample texture using traditional descriptor set: combine the texture array entry with the shared sampler.
+  // nonuniformEXT is required because texId may vary across invocations (non-uniform index).
   if(useTexture)
-    triangleColor *= texture(sampler2D(heapTextures[nonuniformEXT(scene.sceneInfo.texId)], heapSamplers[0]), inUv);
+    triangleColor *= texture(sampler2D(textures[nonuniformEXT(scene.sceneInfo.texId)], linearSampler), inUv);
 
   // Blend the point with the background based on the minimum distance
   //outColor = mix(pointColor, triangleColor, alpha);
@@ -101,7 +99,7 @@ void main()
       if (!(((x&1)==0) && ((y&1)==1))) {
 
         // textureQueryLod returns (accessed mip level, computed lod)
-        vec2 lodInfo = textureQueryLod(sampler2D(heapTextures[nonuniformEXT(scene.sceneInfo.texId)], heapSamplers[0]), uv);
+        vec2 lodInfo = textureQueryLod(sampler2D(textures[nonuniformEXT(scene.sceneInfo.texId)], linearSampler), uv);
 
         float mipLevel   = lodInfo.x;
         float computedLod = lodInfo.y;
@@ -119,7 +117,7 @@ void main()
         vec3 color = mix(vec3(0.0, 0.2, 1.0), vec3(1.0, 0.0, 0.0), t);
 
         outColor = vec4(color, 1.0);
-        outColor = texture(sampler2D(heapTextures[nonuniformEXT(scene.sceneInfo.texId)], heapSamplers[0]), inUv);
+        outColor = texture(sampler2D(textures[nonuniformEXT(scene.sceneInfo.texId)], linearSampler), inUv);
 
         if (x == 256 && y == 256) {
           vec2 ddx = dFdxFine(uv);
