@@ -569,15 +569,15 @@ struct ValidationSettings
   VkBool32 object_lifetime{VK_TRUE};
   VkBool32 stateless_param{VK_TRUE};
   std::vector<const char*> debug_action{"VK_DBG_LAYER_ACTION_LOG_MSG"};  // "VK_DBG_LAYER_ACTION_DEBUG_OUTPUT", "VK_DBG_LAYER_ACTION_BREAK"
-  std::vector<const char*> report_flags{"error", "warn"};  // Enable both errors and warnings
+  std::vector<const char*> report_flags{"error", "warn", "info"};  // Include info for shader debugPrintfEXT output
   std::vector<const char*> message_id_filter{"WARNING-legacy-gpdp2"};  // Filter: legacy vkGetPhysicalDeviceProperties warning from third-party libs (ImGui/VMA)
 
   /*--
    * Build the pNext chain to enable these settings on the validation layer.
    *
    * IMPORTANT: the returned pointer is only valid for the lifetime of *this.
-   * It points into m_layerSettingsCreateInfo (and transitively into
-   * m_layerSettings), both of which are members. Callers MUST ensure the
+   * It points into m_validationFeaturesCreateInfo / m_layerSettingsCreateInfo
+   * (and transitively into member vectors). Callers MUST ensure the
    * ValidationSettings object outlives any Vulkan call that consumes the
    * chain (typically: keep it on the stack until after vkCreateInstance).
   -*/
@@ -607,12 +607,26 @@ struct ValidationSettings
         .pSettings    = layerSettings.data(),
     };
 
-    return reinterpret_cast<VkBaseInStructure*>(&layerSettingsCreateInfo);
+    validationFeatureEnables = std::vector<VkValidationFeatureEnableEXT>{
+        VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT,
+    };
+    validationFeaturesCreateInfo = {
+        .sType                          = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
+        .pNext                          = &layerSettingsCreateInfo,
+        .enabledValidationFeatureCount  = uint32_t(validationFeatureEnables.size()),
+        .pEnabledValidationFeatures     = validationFeatureEnables.data(),
+        .disabledValidationFeatureCount = 0,
+        .pDisabledValidationFeatures    = nullptr,
+    };
+
+    return reinterpret_cast<VkBaseInStructure*>(&validationFeaturesCreateInfo);
   }
 
-  static constexpr const char*   layerName{"VK_LAYER_KHRONOS_validation"};
-  std::vector<VkLayerSettingEXT> layerSettings;
-  VkLayerSettingsCreateInfoEXT   layerSettingsCreateInfo{};
+  static constexpr const char*              layerName{"VK_LAYER_KHRONOS_validation"};
+  std::vector<VkLayerSettingEXT>            layerSettings;
+  VkLayerSettingsCreateInfoEXT              layerSettingsCreateInfo{};
+  std::vector<VkValidationFeatureEnableEXT> validationFeatureEnables;
+  VkValidationFeaturesEXT                   validationFeaturesCreateInfo{};
 };
 
 /*--
@@ -800,7 +814,8 @@ private:
     {
       const VkDebugUtilsMessengerCreateInfoEXT dbg_messenger_create_info{
           .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-          .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+          .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
+                             | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
           .messageType     = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT,
           .pfnUserCallback = Context::debugCallback,  // <-- The callback function
       };
