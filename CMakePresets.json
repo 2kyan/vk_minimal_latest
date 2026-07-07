@@ -1,0 +1,71 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "binaryDir": "${workspaceFolder}/build/${presetName}",
+            "installDir": "${workspaceFolder}/build/${presetName}",
+            "cacheVariables": {
+                "BUILD_DIR": "build/${presetName}",
+                "USE_SLANG": "OFF",
+                "CMAKE_TLS_VERIFY": "OFF"
+            }
+        },
+        {
+            "name": "debug",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "release",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "windows",
+            "hidden": true,
+            "inherits": ["base"],
+            "generator": "Visual Studio 17 2022",
+            "architecture": "x64",
+            "cacheVariables": {
+                "EXAMPLE_CFG": "OFF"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "windows-debug",
+            "inherits": ["windows", "debug"],
+            "displayName": "windows debug"
+        },
+        {
+            "name": "windows-release",
+            "inherits": ["windows", "release"],
+            "displayName": "windows release"
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "build-windows-debug",
+            "configurePreset": "windows-debug",
+            "configuration": "Debug"
+        },
+        {
+            "name": "build-windows-release",
+            "configurePreset": "windows-release",
+            "configuration": "Release",
+            "targets": [
+                "ALL_BUILD",
+                "install"
+            ]
+        }
+    ]
+}

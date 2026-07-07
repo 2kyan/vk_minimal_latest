@@ -34,7 +34,7 @@ void main()
 
   // Adjust aspect ratio using resolution from the scene buffer
   float aspectRatio = scene.sceneInfo.resolution.y / scene.sceneInfo.resolution.x;
-  pos.x *= aspectRatio;
+  //pos.x *= aspectRatio;
   // Set the position in clip space
   gl_Position = vec4(pos, 1.0);
   // Pass the color and uv

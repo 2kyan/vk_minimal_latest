@@ -167,13 +167,13 @@ struct Vertex : public shaderio::Vertex
 
 // 2x3 vertices with a position, color and texCoords, make two CCW triangles
 static const auto s_vertices = std::to_array<shaderio::Vertex>({
-    {{0.0F, -0.5F, 0.5F}, {1.0F, 0.0F, 0.0F}, {0.5F, 0.5F}},  // Colored triangle
-    {{-0.5F, 0.5F, 0.5F}, {0.0F, 0.0F, 1.0F}, {0.5F, 0.5F}},
-    {{0.5F, 0.5F, 0.5F}, {0.0F, 1.0F, 0.0F}, {0.5F, 0.5F}},
+    {{0.0F, -0.5F, 0.5F}, {1.0F, 0.0F, 0.0F}, {0.5F, 0.6F}},  // Colored triangle
+    {{-0.5F, 0.5F, 0.5F}, {0.0F, 0.0F, 1.0F}, {0.5F, 0.6F}},
+    {{0.5F, 0.5F, 0.5F}, {0.0F, 1.0F, 0.0F}, {0.5F, 0.6F}},
     //
-    {{0.0F, -1.0F, 0.75F}, {.3F, .3F, .3F}, {0.5F, 1.0F}},  // White triangle (textured)
-    {{-1.0F, 1.0F, 0.25F}, {1.0F, 1.0F, 1.0F}, {1.0F, 0.0F}},
-    {{1.0F, 1.0F, 0.75F}, {.7F, .7F, .7F}, {0.0F, 0.0F}},
+    {{0.0F, -1.0F, 0.75F}, {.3F, .3F, .3F}, {0.9F, 1.0F}},  // White triangle (textured)
+    {{-1.0F, 1.0F, 0.25F}, {1.0F, 1.0F, 1.0F}, {1.0F, 0.9F}},
+    {{1.0F, 1.0F, 0.75F}, {.7F, .7F, .7F}, {0.9F, 0.9F}},
 });
 
 

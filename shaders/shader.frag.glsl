@@ -37,7 +37,7 @@ layout(buffer_reference, scalar) readonly buffer Datas { vec2 _[]; };
 layout(constant_id = 0) const bool useTexture = false;
 
 
-void main()
+void reference()
 {
   // Access the scene info buffer via its device address (updated once per frame on the CPU side)
   SceneInfoRef scene = SceneInfoRef(pushData.sceneInfoAddress);
@@ -75,4 +75,38 @@ void main()
   // Blend the point with the background based on the minimum distance
   //outColor = mix(pointColor, triangleColor, alpha);
   outColor = triangleColor;
+}
+
+void main()
+{
+    // Access the scene info buffer via its device address to retrieve the texture index
+    SceneInfoRef scene = SceneInfoRef(pushData.sceneInfoAddress);
+
+    uint x = uint(gl_FragCoord.x);
+    uint y = uint(gl_FragCoord.y);
+
+    vec2 uv = vec2(0.0, 0.0);
+    outColor = vec4(0.0, 1.0, 0.0, 1.0);
+
+    if (((x & 1) == 0) && ((y & 1) == 0))
+    {
+      vec2 uv = inUv * 0.5f;
+
+      // textureQueryLod returns (accessed mip level, computed lod)
+      vec2 lodInfo = textureQueryLod(sampler2D(heapTextures[nonuniformEXT(scene.sceneInfo.texId)], heapSamplers[0]), uv);
+
+      float mipLevel   = lodInfo.x;
+      float computedLod = lodInfo.y;
+
+      // Normalize for visualization.
+      // Change maxMip according to your texture's mip count.
+      float maxMip = 8.0;
+      float t = clamp(computedLod / maxMip, 0.0, 1.0);
+
+      // Simple heatmap:
+      // blue = low LOD, red = high LOD
+      vec3 color = mix(vec3(0.0, 0.2, 1.0), vec3(1.0, 0.0, 0.0), t);
+
+      outColor = vec4(color, 1.0);
+    }
 }
