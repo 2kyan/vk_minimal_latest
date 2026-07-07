@@ -193,8 +193,9 @@ class MinimalLatest
 {
 public:
   MinimalLatest() = default;
-  MinimalLatest(VkExtent2D size = {1280, 1024})
+  MinimalLatest(VkExtent2D size = {1280, 1024}, int gpuIndex = -1)
       : m_windowSize(size)
+      , m_gpuIndex(gpuIndex)
   {
     // Vulkan Loader
     VK_CHECK(volkInitialize());
@@ -413,6 +414,7 @@ private:
 
     // Configure Vulkan context with required and optional extensions
     utils::ContextCreateInfo contextConfig;
+    contextConfig.deviceIndex = m_gpuIndex;
 
     // Required extensions (with their feature struct pointers)
     contextConfig.deviceExtensions.push_back({VK_KHR_SWAPCHAIN_EXTENSION_NAME, true, nullptr});
@@ -1805,6 +1807,7 @@ private:
   VkSurfaceKHR m_surface{};               // The window surface
   VkExtent2D   m_windowSize{800, 600};    // The window size
   VkExtent2D   m_viewportSize{800, 600};  // The viewport area in the window
+  int          m_gpuIndex{-1};            // GPU index from --gpu argument (-1 = auto)
 
   // Graphics: shader objects (VK_EXT_shader_object) + traditional descriptor set + pipeline layout.
   VkShaderEXT      m_vertShader{};            // Shared vertex shader
@@ -1844,7 +1847,7 @@ private:
 };
 
 //--- Main ---------------------------------------------------------------------------------------------------------------
-int main()
+int main(int argc, char* argv[])
 {
   // Get the logger instance
   utils::Logger& logger = utils::Logger::getInstance();
@@ -1853,12 +1856,26 @@ int main()
   logger.setLogLevel(utils::Logger::LogLevel::eINFO);  // Default is Warning, we show more information
   LOGI("Starting ... ");
 
+  // Parse command-line arguments
+  int gpuIndex = -1;
+  for(int i = 1; i < argc; i++)
+  {
+    if(std::strcmp(argv[i], "--gpu") == 0 && i + 1 < argc)
+    {
+      gpuIndex = std::stoi(argv[++i]);
+    }
+    else if(std::strncmp(argv[i], "--gpu=", 6) == 0)
+    {
+      gpuIndex = std::stoi(argv[i] + 6);
+    }
+  }
+
   try
   {
     ASSERT(glfwInit() == GLFW_TRUE, "Could not initialize GLFW!");
     ASSERT(glfwVulkanSupported() == GLFW_TRUE, "GLFW: Vulkan not supported!");
 
-    MinimalLatest app({800, 600});
+    MinimalLatest app({800, 600}, gpuIndex);
     app.run();
 
     glfwTerminate();

@@ -672,6 +672,10 @@ struct ContextCreateInfo
   // Note: These are the extensions that will be requested from the device
   // The Context will check availability and enable them based on the 'required' flag
   std::vector<ExtensionConfig> deviceExtensions;
+
+  // Device selection: index into the enumerated VkPhysicalDevice list.
+  // -1 (default) = auto-select the first discrete GPU, or fall back to device 0.
+  int deviceIndex = -1;
 };
 
 /*--
@@ -831,8 +835,6 @@ private:
   -*/
   void selectPhysicalDevice()
   {
-    size_t chosenDevice = 0;
-
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(m_instance, &deviceCount, nullptr);
     ASSERT(deviceCount != 0, "failed to find GPUs with Vulkan support!");
@@ -840,21 +842,49 @@ private:
     std::vector<VkPhysicalDevice> physicalDevices(deviceCount);
     vkEnumeratePhysicalDevices(m_instance, &deviceCount, physicalDevices.data());
 
+    // List all available devices
     VkPhysicalDeviceProperties2 properties2{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
-    for(size_t i = 0; i < physicalDevices.size(); i++)
+    LOGI("Available GPUs (%u):", deviceCount);
+    for(uint32_t i = 0; i < deviceCount; i++)
     {
       vkGetPhysicalDeviceProperties2(physicalDevices[i], &properties2);
-      if(properties2.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+      const char* deviceTypeStr = "Other";
+      switch(properties2.properties.deviceType)
       {
-        chosenDevice = i;
-        break;
+        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:   deviceTypeStr = "Discrete GPU";   break;
+        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: deviceTypeStr = "Integrated GPU"; break;
+        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:    deviceTypeStr = "Virtual GPU";    break;
+        case VK_PHYSICAL_DEVICE_TYPE_CPU:            deviceTypeStr = "CPU";            break;
+        default: break;
+      }
+      LOGI("  [%u] %s (%s)", i, properties2.properties.deviceName, deviceTypeStr);
+    }
+
+    // Determine which device to use
+    size_t chosenDevice = 0;
+    if(m_createInfo.deviceIndex >= 0 && static_cast<uint32_t>(m_createInfo.deviceIndex) < deviceCount)
+    {
+      chosenDevice = static_cast<size_t>(m_createInfo.deviceIndex);
+      LOGI("Using GPU index %d (requested via --gpu)", m_createInfo.deviceIndex);
+    }
+    else
+    {
+      // Auto-select: prefer first discrete GPU
+      for(size_t i = 0; i < physicalDevices.size(); i++)
+      {
+        vkGetPhysicalDeviceProperties2(physicalDevices[i], &properties2);
+        if(properties2.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+        {
+          chosenDevice = i;
+          break;
+        }
       }
     }
 
     m_physicalDevice = physicalDevices[chosenDevice];
     vkGetPhysicalDeviceProperties2(m_physicalDevice, &properties2);
     m_deviceApiVersion = properties2.properties.apiVersion;
-    LOGI("Selected GPU: %s", properties2.properties.deviceName);  // Show the name of the GPU
+    LOGI("Selected GPU: [%zu] %s", chosenDevice, properties2.properties.deviceName);
     LOGI("Driver: %d.%d.%d", VK_VERSION_MAJOR(properties2.properties.driverVersion),
          VK_VERSION_MINOR(properties2.properties.driverVersion), VK_VERSION_PATCH(properties2.properties.driverVersion));
     LOGI("Vulkan API: %d.%d.%d", VK_VERSION_MAJOR(properties2.properties.apiVersion),

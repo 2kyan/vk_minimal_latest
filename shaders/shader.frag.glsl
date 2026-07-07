@@ -121,10 +121,10 @@ void main()
 
         if (x == 256 && y == 256) {
           vec2 ddx = dFdxFine(uv);
-          debugPrintfEXT("ddx %f, %f", ddx.x, ddx.y);
+          //debugPrintfEXT("ddx %f, %f", ddx.x, ddx.y);
           vec2 ddy = dFdyFine(uv);
-          debugPrintfEXT("ddy %f, %f", ddy.x, ddy.y);
-          debugPrintfEXT("Computed LOD: %f, Mip Level: %f\n", computedLod, mipLevel);
+          //debugPrintfEXT("ddy %f, %f", ddy.x, ddy.y);
+          //debugPrintfEXT("Computed LOD: %f, Mip Level: %f\n", computedLod, mipLevel);
         }
       }
 
