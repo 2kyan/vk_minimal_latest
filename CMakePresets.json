@@ -4,8 +4,9 @@
         {
             "name": "base",
             "hidden": true,
-            "binaryDir": "${workspaceFolder}/build/${presetName}",
-            "installDir": "${workspaceFolder}/build/${presetName}",
+            "architecture": "x64",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "installDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "BUILD_DIR": "build/${presetName}",
                 "USE_SLANG": "OFF",
@@ -27,11 +28,24 @@
             }
         },
         {
+            "name": "vs2022",
+            "hidden": true,
+            "generator": "Visual Studio 17 2022"
+        },
+        {
+            "name": "vs2026",
+            "hidden": true,
+            "generator": "Visual Studio 18 2026"
+        },
+        {
+            "name": "ninja",
+            "hidden": true,
+            "generator": "Ninja"
+        },
+        {
             "name": "windows",
             "hidden": true,
-            "inherits": ["base"],
-            "generator": "Visual Studio 17 2022",
-            "architecture": "x64",
+            "inherits": "base",
             "cacheVariables": {
                 "EXAMPLE_CFG": "OFF"
             },
@@ -42,25 +56,49 @@
             }
         },
         {
-            "name": "windows-debug",
-            "inherits": ["windows", "debug"],
-            "displayName": "windows debug"
+            "name": "windows-debug-vs2022",
+            "inherits": ["windows", "debug", "vs2022"],
+            "displayName": "windows debug vs2022"
         },
         {
-            "name": "windows-release",
-            "inherits": ["windows", "release"],
-            "displayName": "windows release"
+            "name": "windows-release-vs2022",
+            "inherits": ["windows", "release", "vs2022"],
+            "displayName": "windows release vs2022"
+        },
+        {
+            "name": "windows-debug-vs2026",
+            "inherits": ["windows", "debug", "vs2026"],
+            "displayName": "windows debug vs2026"
+        },
+        {
+            "name": "windows-release-vs2026",
+            "inherits": ["windows", "release", "vs2026"],
+            "displayName": "windows release vs2026"
         }
     ],
     "buildPresets": [
         {
-            "name": "build-windows-debug",
-            "configurePreset": "windows-debug",
+            "name": "build-windows-debug-vs2022",
+            "configurePreset": "windows-debug-vs2022",
             "configuration": "Debug"
         },
         {
-            "name": "build-windows-release",
-            "configurePreset": "windows-release",
+            "name": "build-windows-release-vs2022",
+            "configurePreset": "windows-release-vs2022",
+            "configuration": "Release",
+            "targets": [
+                "ALL_BUILD",
+                "install"
+            ]
+        },
+        {
+            "name": "build-windows-debug-vs2026",
+            "configurePreset": "windows-debug-vs2026",
+            "configuration": "Debug"
+        },
+        {
+            "name": "build-windows-release-vs2026",
+            "configurePreset": "windows-release-vs2026",
             "configuration": "Release",
             "targets": [
                 "ALL_BUILD",

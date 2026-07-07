@@ -7,6 +7,8 @@
 #extension GL_EXT_nonuniform_qualifier : require              // For non-uniform indexing of the texture array
 #extension GL_EXT_descriptor_heap : enable                    // For bindless descriptor heap access (VK_EXT_descriptor_heap)
 
+#extension GL_EXT_debug_printf : require                          // For printf in shader (debugging)
+
 #include "shader_io.h"
 
 layout(location = 0) in vec3 fragColor;
@@ -100,6 +102,7 @@ void main()
 
       // Normalize for visualization.
       // Change maxMip according to your texture's mip count.
+      debugPrintfEXT("Computed LOD: %f, Mip Level: %f\n", computedLod, mipLevel);
       float maxMip = 8.0;
       float t = clamp(computedLod / maxMip, 0.0, 1.0);
 
