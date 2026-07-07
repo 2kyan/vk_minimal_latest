@@ -39,7 +39,7 @@ layout(buffer_reference, scalar) readonly buffer Datas { vec2 _[]; };
 layout(constant_id = 0) const bool useTexture = false;
 
 
-void reference()
+void main_ref()
 {
   // Access the scene info buffer via its device address (updated once per frame on the CPU side)
   SceneInfoRef scene = SceneInfoRef(pushData.sceneInfoAddress);
@@ -90,26 +90,45 @@ void main()
     vec2 uv = vec2(0.0, 0.0);
     outColor = vec4(0.0, 1.0, 0.0, 1.0);
 
-    if (((x & 1) == 0) && ((y & 1) == 0))
+    //float uvidx = float((x&1)*2 + (y&1));
+    //uv = inUv * 0.5f;
+    //uv.x = uvidx * 0.125;
+    //uv.y = uvidx * 0.125;
+    uv = inUv;
+
+    if ((((x & 2) == 0) && ((y & 2) == 0)))
     {
-      vec2 uv = inUv * 0.5f;
+      if (!(((x&1)==0) && ((y&1)==1))) {
 
-      // textureQueryLod returns (accessed mip level, computed lod)
-      vec2 lodInfo = textureQueryLod(sampler2D(heapTextures[nonuniformEXT(scene.sceneInfo.texId)], heapSamplers[0]), uv);
+        // textureQueryLod returns (accessed mip level, computed lod)
+        vec2 lodInfo = textureQueryLod(sampler2D(heapTextures[nonuniformEXT(scene.sceneInfo.texId)], heapSamplers[0]), uv);
 
-      float mipLevel   = lodInfo.x;
-      float computedLod = lodInfo.y;
+        float mipLevel   = lodInfo.x;
+        float computedLod = lodInfo.y;
 
-      // Normalize for visualization.
-      // Change maxMip according to your texture's mip count.
-      debugPrintfEXT("Computed LOD: %f, Mip Level: %f\n", computedLod, mipLevel);
-      float maxMip = 8.0;
-      float t = clamp(computedLod / maxMip, 0.0, 1.0);
+        // Normalize for visualization.
+        // Change maxMip according to your texture's mip count.
+        if (computedLod > -32.0) {
+            //debugPrintfEXT("Computed LOD: %f, Mip Level: %f\n", computedLod, mipLevel);
+        }
+        float maxMip = 8.0;
+        float t = clamp(computedLod / maxMip, 0.0, 1.0);
 
-      // Simple heatmap:
-      // blue = low LOD, red = high LOD
-      vec3 color = mix(vec3(0.0, 0.2, 1.0), vec3(1.0, 0.0, 0.0), t);
+        // Simple heatmap:
+        // blue = low LOD, red = high LOD
+        vec3 color = mix(vec3(0.0, 0.2, 1.0), vec3(1.0, 0.0, 0.0), t);
 
-      outColor = vec4(color, 1.0);
+        outColor = vec4(color, 1.0);
+        outColor = texture(sampler2D(heapTextures[nonuniformEXT(scene.sceneInfo.texId)], heapSamplers[0]), inUv);
+
+        if (x == 256 && y == 256) {
+          vec2 ddx = dFdxFine(uv);
+          debugPrintfEXT("ddx %f, %f", ddx.x, ddx.y);
+          vec2 ddy = dFdyFine(uv);
+          debugPrintfEXT("ddy %f, %f", ddy.x, ddy.y);
+          debugPrintfEXT("Computed LOD: %f, Mip Level: %f\n", computedLod, mipLevel);
+        }
+      }
+
     }
 }

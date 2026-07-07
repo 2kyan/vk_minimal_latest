@@ -171,9 +171,9 @@ static const auto s_vertices = std::to_array<shaderio::Vertex>({
     {{-0.5F, 0.5F, 0.5F}, {0.0F, 0.0F, 1.0F}, {0.5F, 0.6F}},
     {{0.5F, 0.5F, 0.5F}, {0.0F, 1.0F, 0.0F}, {0.5F, 0.6F}},
     //
-    {{0.0F, -1.0F, 0.75F}, {.3F, .3F, .3F}, {10.0F, 00.0F}},  // White triangle (textured)
-    {{-1.0F, 1.0F, 0.25F}, {1.0F, 1.0F, 1.0F}, {00.0F, 10.0F}},
-    {{1.0F, 1.0F, 0.75F}, {.7F, .7F, .7F}, {5.0F, 5.0F}},
+    {{-0.9F, -0.9F, 0.75F}, {.3F, .3F, .3F}, {0.0F, 8.0F}},  // White triangle (textured)
+    {{-0.9F, 0.9F, 0.25F}, {1.0F, 1.0F, 1.0F}, {0.0F, 0.0F}},
+    {{ 0.9F, 0.9F, 0.75F}, {.7F, .7F, .7F}, {8.0F, 0.0F}},
 });
 
 
@@ -193,7 +193,7 @@ class MinimalLatest
 {
 public:
   MinimalLatest() = default;
-  MinimalLatest(VkExtent2D size = {800, 600})
+  MinimalLatest(VkExtent2D size = {1280, 1024})
       : m_windowSize(size)
   {
     // Vulkan Loader
