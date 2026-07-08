@@ -4,7 +4,6 @@
         {
             "name": "base",
             "hidden": true,
-            "architecture": "x64",
             "binaryDir": "${sourceDir}/build/${presetName}",
             "installDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
@@ -45,6 +44,7 @@
         {
             "name": "windows",
             "hidden": true,
+            "architecture": "x64",
             "inherits": "base",
             "cacheVariables": {
                 "EXAMPLE_CFG": "OFF"
@@ -53,6 +53,29 @@
                 "type": "equals",
                 "lhs": "${hostSystemName}",
                 "rhs": "Windows"
+            }
+        },
+        {
+            "name": "macos",
+            "hidden": true,
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_OSX_ARCHITECTURES": "arm64"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            }
+        },
+        {
+            "name": "linux",
+            "hidden": true,
+            "inherits": "base",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
             }
         },
         {
@@ -74,6 +97,11 @@
             "name": "windows-release-vs2026",
             "inherits": ["windows", "release", "vs2026"],
             "displayName": "windows release vs2026"
+        },
+        {
+            "name": "macos-debug",
+            "inherits": ["macos", "debug", "ninja"],
+            "displayName": "macos debug"
         }
     ],
     "buildPresets": [
@@ -104,6 +132,11 @@
                 "ALL_BUILD",
                 "install"
             ]
+        },
+        {
+            "name": "build-macos-debug",
+            "configurePreset": "macos-debug",
+            "configuration": "Debug"
         }
     ]
 }
