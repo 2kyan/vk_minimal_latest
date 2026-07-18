@@ -273,3 +273,9 @@ install(TARGETS ${MYPROJ}
 install(FILES ${RUNTIME_IMAGE_FILES}
     DESTINATION bin
 )
+
+# Install GLSL shader sources so the runtime glslangValidator compilation works
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/shaders/"
+    DESTINATION bin/shaders
+    FILES_MATCHING PATTERN "*.glsl" PATTERN "*.h"
+)

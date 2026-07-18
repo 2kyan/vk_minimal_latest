@@ -119,9 +119,26 @@ using this regular expression:
 #include "_autogen/shader.comp.slang.h"
 #include "_autogen/shader.rast.slang.h"
 #else
-#include "_autogen/shader.frag.glsl.h"
-#include "_autogen/shader.vert.glsl.h"
-#include "_autogen/shader.comp.glsl.h"
+// GLSL shaders are compiled at runtime via glslangValidator; no precompiled headers needed.
+#include <cstdlib>
+#include <fstream>
+static std::vector<uint32_t> compileGlslToSpirv(const char* glslPath)
+{
+  namespace fs           = std::filesystem;
+  const fs::path spvPath = fs::temp_directory_path() / (fs::path(glslPath).filename().string() + ".spv");
+  const std::string cmd  = std::string("glslangValidator -g -D__GLSL__ --target-env vulkan1.3 -V -o \"")
+                           + spvPath.string() + "\" \"" + glslPath + "\"";
+  const int ret = std::system(cmd.c_str());
+  ASSERT(ret == 0, "glslangValidator failed");
+
+  std::ifstream file(spvPath, std::ios::binary | std::ios::ate);
+  ASSERT(file.is_open(), "Failed to open compiled SPIR-V");
+  const std::streamsize fileSize = file.tellg();
+  std::vector<uint32_t> spirv(static_cast<size_t>(fileSize) / sizeof(uint32_t));
+  file.seekg(0);
+  file.read(reinterpret_cast<char*>(spirv.data()), fileSize);
+  return spirv;
+}
 #endif
 
 namespace shaderio {  // Shader IO namespace -- shared layout between C++ and shaders
@@ -1404,10 +1421,12 @@ private:
     const std::span<const uint32_t> vertCode{shader_rast_slang, std::size(shader_rast_slang)};
     const std::span<const uint32_t> fragCode{shader_rast_slang, std::size(shader_rast_slang)};  // Same module, different entry
 #else
-    const char*                     vertEntryName = "main";
-    const char*                     fragEntryName = "main";
-    const std::span<const uint32_t> vertCode{shader_vert_glsl, std::size(shader_vert_glsl)};
-    const std::span<const uint32_t> fragCode{shader_frag_glsl, std::size(shader_frag_glsl)};
+    const char*                  vertEntryName = "main";
+    const char*                  fragEntryName = "main";
+    const std::vector<uint32_t> vertSpv = compileGlslToSpirv("shaders/shader.vert.glsl");
+    const std::vector<uint32_t> fragSpv = compileGlslToSpirv("shaders/shader.frag.glsl");
+    const std::span<const uint32_t> vertCode{vertSpv};
+    const std::span<const uint32_t> fragCode{fragSpv};
 #endif
 
     /*--
@@ -1680,7 +1699,8 @@ private:
 #if USE_SLANG
     VkShaderModule compute = utils::createShaderModule(m_context.getDevice(), {shader_comp_slang, std::size(shader_comp_slang)});
 #else
-    VkShaderModule compute = utils::createShaderModule(m_context.getDevice(), {shader_comp_glsl, std::size(shader_comp_glsl)});
+    const std::vector<uint32_t> compSpv = compileGlslToSpirv("shaders/shader.comp.glsl");
+    VkShaderModule compute = utils::createShaderModule(m_context.getDevice(), compSpv);
 #endif
     DBG_VK_NAME(compute);
 
