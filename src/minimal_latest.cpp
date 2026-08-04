@@ -533,9 +533,7 @@ private:
       ASSERT(!filename.empty(), "Could not load texture image!");
       m_image[0] = loadAndCreateImage(cmd, filename);
 
-      filename = utils::findFile("image2.jpg", searchPaths);
-      ASSERT(!filename.empty(), "Could not load texture image!");
-      m_image[1] = loadAndCreateImage(cmd, filename);
+      m_image[1] = createMipColorTexture(cmd);
 
       // Create the descriptor set (traditional Vulkan 1.3 binding for textures + sampler).
       // This must happen after images are loaded, since the set references the VkImageView handles.
@@ -1633,6 +1631,104 @@ private:
     utils::DebugUtil::getInstance().setObjectName(image.view, "Texture View " + filename);
 
     return image;
+  }
+
+  /*--
+   * Create a 1024x1024 texture with 11 mip levels where each level is filled
+   * with a distinct solid colour, making LOD transitions visually obvious.
+  -*/
+  utils::ImageResource createMipColorTexture(VkCommandBuffer cmd)
+  {
+    static constexpr uint32_t BASE_SIZE  = 1024;
+    static constexpr uint32_t MIP_LEVELS = 11;  // log2(1024) + 1
+    static constexpr VkFormat FORMAT     = VK_FORMAT_R8G8B8A8_UNORM;
+
+    // Rainbow hue rotation: each mip steps +30° through the colour wheel
+    // (red→orange→yellow→lime→green→teal→cyan→sky→blue→violet→magenta),
+    // so the spectral position directly encodes the LOD level.
+    // Stored as 0xAABBGGRR (little-endian uint32, VK_FORMAT_R8G8B8A8_UNORM).
+    static constexpr uint32_t MIP_COLORS[MIP_LEVELS] = {
+        0xFF0000FF,  // mip  0  1024x1024  hue   0°  red
+        0xFF0080FF,  // mip  1   512x512   hue  30°  orange
+        0xFF00FFFF,  // mip  2   256x256   hue  60°  yellow
+        0xFF00FF80,  // mip  3   128x128   hue  90°  lime
+        0xFF00FF00,  // mip  4    64x64    hue 120°  green
+        0xFF80FF00,  // mip  5    32x32    hue 150°  teal
+        0xFFFFFF00,  // mip  6    16x16    hue 180°  cyan
+        0xFFFF8000,  // mip  7     8x8     hue 210°  sky blue
+        0xFFFF0000,  // mip  8     4x4     hue 240°  blue
+        0xFFFF0080,  // mip  9     2x2     hue 270°  violet
+        0xFFFF00FF,  // mip 10     1x1     hue 300°  magenta
+    };
+
+    // Build a flat pixel buffer containing every mip level back-to-back
+    std::vector<uint32_t> pixels;
+    std::vector<VkDeviceSize> mipByteOffsets(MIP_LEVELS);
+    for(uint32_t i = 0; i < MIP_LEVELS; i++)
+    {
+      mipByteOffsets[i] = pixels.size() * sizeof(uint32_t);
+      const uint32_t w   = std::max(1u, BASE_SIZE >> i);
+      const uint32_t h   = std::max(1u, BASE_SIZE >> i);
+      pixels.insert(pixels.end(), w * h, MIP_COLORS[i]);
+    }
+
+    // Upload pixel data into a tracked staging buffer via the allocator
+    const std::span<uint32_t> dataSpan(pixels);
+    utils::Buffer stagingBuffer = m_allocator.createStagingBuffer(dataSpan);
+
+    // Create the device-local image with enough mip levels
+    const VkImageCreateInfo imageCI{
+        .sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .imageType   = VK_IMAGE_TYPE_2D,
+        .format      = FORMAT,
+        .extent      = {BASE_SIZE, BASE_SIZE, 1},
+        .mipLevels   = MIP_LEVELS,
+        .arrayLayers = 1,
+        .samples     = VK_SAMPLE_COUNT_1_BIT,
+        .usage       = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+    };
+    utils::Image image = m_allocator.createImage(imageCI);
+
+    // Transition all mip levels UNDEFINED -> GENERAL (ready for transfer writes)
+    utils::cmdInitImageLayout(cmd, image.image);
+
+    // One copy region per mip level
+    std::vector<VkBufferImageCopy> regions(MIP_LEVELS);
+    for(uint32_t i = 0; i < MIP_LEVELS; i++)
+    {
+      const uint32_t w = std::max(1u, BASE_SIZE >> i);
+      const uint32_t h = std::max(1u, BASE_SIZE >> i);
+      regions[i] = {
+          .bufferOffset = mipByteOffsets[i],
+          .imageSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = i, .layerCount = 1},
+          .imageExtent  = {w, h, 1},
+      };
+    }
+    vkCmdCopyBufferToImage(cmd, stagingBuffer.buffer, image.image,
+                           VK_IMAGE_LAYOUT_GENERAL, uint32_t(regions.size()), regions.data());
+
+    // Build the ImageResource and create a view spanning all mip levels
+    utils::ImageResource result(image);
+    result.extent = {BASE_SIZE, BASE_SIZE};
+    result.format = FORMAT;
+    result.layout = VK_IMAGE_LAYOUT_GENERAL;
+
+    const VkImageViewCreateInfo viewCI{
+        .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image    = image.image,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format   = FORMAT,
+        .subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .levelCount = MIP_LEVELS,
+            .layerCount = 1,
+        },
+    };
+    VK_CHECK(vkCreateImageView(m_context.getDevice(), &viewCI, nullptr, &result.view));
+    utils::DebugUtil::getInstance().setObjectName(result.image, "MipColorTexture");
+    utils::DebugUtil::getInstance().setObjectName(result.view,  "MipColorTexture View");
+
+    return result;
   }
 
   /*--
