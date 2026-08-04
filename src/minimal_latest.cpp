@@ -1143,6 +1143,7 @@ private:
     // above), so passing explicit sizes/strides here is fine.
     vkCmdBindVertexBuffers2(cmd, 0, 1, &m_vertexBuffer.buffer, offsets, sizes, nullptr);
 
+    /*
     // Bind shader objects: vertex stage (shared) + the no-texture fragment stage.
     utils::cmdBindGraphicsShaders(cmd, m_vertShader, m_fragShaderNoTexture);
 
@@ -1151,6 +1152,7 @@ private:
     vkCmdPushConstants2(cmd, &pushConstantsInfo);
     vkCmdDraw(cmd, 3, 1, 0, 0);  // 3 vertices, 1 instance, 0 offset
 
+    */
     // Swap to the textured fragment shader; vertex stage stays bound.
     utils::cmdBindGraphicsShaders(cmd, m_vertShader, m_fragShaderTextured);
 
