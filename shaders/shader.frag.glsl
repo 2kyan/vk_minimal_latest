@@ -81,45 +81,53 @@ void main()
 {
     // Access the scene info buffer via its device address to retrieve the texture index
     SceneInfoRef scene = SceneInfoRef(pushData.sceneInfoAddress);
-
+ 
     uint x = uint(gl_FragCoord.x);
     uint y = uint(gl_FragCoord.y);
-
+ 
     vec2 uv = vec2(0.0, 0.0);
-    outColor = vec4(0.0, 1.0, 0.0, 1.0);
-
+    outColor = vec4(0.0, 0.0, 0.0, 0.0);
+ 
     //float uvidx = float((x&1)*2 + (y&1));
+	float uvidx = float((x&1) * 1 + (y&1));
     //uv = inUv * 0.5f;
-    //uv.x = uvidx * 0.125;
-    //uv.y = uvidx * 0.125;
-    uv = inUv;
-
-    if ((((x & 2) == 0) && ((y & 2) == 0)))
+    uv.x = uvidx * 0.0625;
+    uv.y = uvidx * 0.0625;
+    // uv = inUv * 1.0;
+ 
+    //if ((((x & 2) == 0) && ((y & 2) == 0)))
     {
-      if (!(((x&1)==0) && ((y&1)==1))) {
-
+      //if (!(((x&1)==1) && ((y&1)==1))) 
+	  if ( !(((x&1)==1) && ((y&1)==0)) || (x > 256)) 
+	  // if ((x > 256) || ((x > 128) && !((x&1) == 0)) || ((x > 0 && x < 128) && !((y&1) == 0)))
+	  {
+			uv.x = uv.x * 1;
+			uv.y = uv.y * 1;
+			uv = inUv * 0.03125;
+ 
         // textureQueryLod returns (accessed mip level, computed lod)
         vec2 lodInfo = textureQueryLod(sampler2D(textures[nonuniformEXT(scene.sceneInfo.texId)], linearSampler), uv);
-
+ 
         float mipLevel   = lodInfo.x;
         float computedLod = lodInfo.y;
-
+ 
         // Normalize for visualization.
         // Change maxMip according to your texture's mip count.
         if (computedLod > -32.0) {
-            //debugPrintfEXT("Computed LOD: %f, Mip Level: %f\n", computedLod, mipLevel);
+            // debugPrintfEXT("Computed LOD: %f, Mip Level: %f\n", computedLod, mipLevel);
         }
         float maxMip = 8.0;
         float t = clamp(computedLod / maxMip, 0.0, 1.0);
-
+ 
         // Simple heatmap:
         // blue = low LOD, red = high LOD
         vec3 color = mix(vec3(0.0, 0.2, 1.0), vec3(1.0, 0.0, 0.0), t);
-
+ 
         outColor = vec4(color, 1.0);
-        outColor = texture(sampler2D(textures[nonuniformEXT(scene.sceneInfo.texId)], linearSampler), inUv);
-
-        if (x == 256 && y == 256) {
+        outColor = texture(sampler2D(textures[nonuniformEXT(scene.sceneInfo.texId)], linearSampler), uv);
+ 
+        if ((x == (253 - 192)) && (y == (261 + 192 + 64 + 32)))
+		{
           vec2 ddx = dFdxFine(uv);
           //debugPrintfEXT("ddx %f, %f", ddx.x, ddx.y);
           vec2 ddy = dFdyFine(uv);
@@ -127,6 +135,6 @@ void main()
           //debugPrintfEXT("Computed LOD: %f, Mip Level: %f\n", computedLod, mipLevel);
         }
       }
-
+ 
     }
 }
